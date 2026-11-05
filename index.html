@@ -79,7 +79,9 @@
     function kstToUtcStamp(st){let d=new Date(`${st.date.slice(0,4)}-${st.date.slice(4,6)}-${st.date.slice(6,8)}T${st.time.slice(0,2)}:${st.time.slice(2,4)}:00+09:00`);return`${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}`}
     function getApiKey(kind){return localStorage.getItem(API_KEYS[kind])||localStorage.getItem(KEY)||''}
     function getApiUrl(kind){return localStorage.getItem('weatherly_kma_url_'+kind)||API_URLS[kind]}
-    function makeApiUrl(kind,params){let u=new URL(getApiUrl(kind));Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));return u}
+    function migrateEmbeddedApiKeys(){Object.keys(API_URLS).forEach(kind=>{let storageKey='weatherly_kma_url_'+kind,raw=localStorage.getItem(storageKey);if(!raw)return;try{let url=new URL(raw),embedded=url.searchParams.get('authKey')||url.searchParams.get('serviceKey');if(embedded&&!localStorage.getItem(API_KEYS[kind]))localStorage.setItem(API_KEYS[kind],embedded);url.searchParams.delete('authKey');url.searchParams.delete('serviceKey');localStorage.setItem(storageKey,url.toString())}catch(e){}})}
+    migrateEmbeddedApiKeys();
+    function makeApiUrl(kind,params){let u=new URL(getApiUrl(kind)),args={...params},key=args.authKey||args.serviceKey;delete args.authKey;delete args.serviceKey;const authStyle=kind.startsWith('map')||u.hostname.toLowerCase()==='apihub.kma.go.kr'||u.pathname.includes('/api/typ02/openApi/');u.searchParams.delete('authKey');u.searchParams.delete('serviceKey');Object.entries(args).forEach(([k,v])=>u.searchParams.set(k,v));if(key)u.searchParams.set(authStyle?'authKey':'serviceKey',decodedKey(key));return u}
     async function kma(path,params,kind){kind=kind||({getUltraSrtNcst:'ncst',getUltraSrtFcst:'ultra',getVilageFcst:'short'}[path]);let key=getApiKey(kind);if(!key)throw Error('해당 조회의 기상청 인증키를 설정해 주세요.');let u=makeApiUrl(kind,{serviceKey:decodedKey(key),pageNo:1,numOfRows:1000,dataType:'JSON',...params});let r=await fetch(u);if(!r.ok)throw Error(`기상청 API 오류 (${r.status})`);let data=await r.json(),body=data.response?.body;if(data.response?.header?.resultCode!=='00')throw Error(data.response?.header?.resultMsg||'API 응답 오류');return body?.items?.item||[]}
     function gridOf(p){return{nx:p.nx||CENTERS[p.province][0],ny:p.ny||CENTERS[p.province][1]}}
     async function loadPlaceWeather(i){let p=places[i];if(!p||!getApiKey('ncst'))return;try{let bt=baseStamp('ncst'),it=await kma('getUltraSrtNcst',{base_date:bt.date,base_time:bt.time,...gridOf(p)},'ncst'),m=Object.fromEntries(it.map(x=>[x.category,x.obsrValue]));p.weather={temp:m.T1H??'--',humidity:m.REH,wind:m.WSD,icon:m.PTY==='1'?'🌧️':m.PTY==='3'?'❄️':m.PTY==='2'?'🌧️':Number(m.SKY)>5?'☁️':'☀️',desc:m.PTY==='1'?'비':m.PTY==='2'?'비/눈':m.PTY==='3'?'눈':Number(m.SKY)>5?'흐림':'맑음'};p.updated=new Intl.DateTimeFormat('ko-KR',{hour:'2-digit',minute:'2-digit'}).format(new Date());persist();renderPlaces()}catch(e){toast(e.message)}}
@@ -102,3 +104,4 @@
   </script>
 </body>
 </html>
+
