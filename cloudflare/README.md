@@ -18,7 +18,9 @@ headers that the GitHub Pages browser app needs. It only accepts requests from
    - `/api/kma/mapVillage`
    - `/api/kma/mapUltra`
 
-The deployed Worker origin has the form
-`https://korean-weather-forecast-proxy.<account-subdomain>.workers.dev`.
-The browser app still needs its six API URL settings updated to that origin.
+The deployed Worker origin for this account is
+`https://korean-weather-forecast-proxy.canigetsome.workers.dev`. The GitHub
+Pages app already uses this origin for its six KMA operations. The API key stays
+in the Worker secret and is removed from the browser's legacy local storage once
+the app sees the proxy URLs.
 
